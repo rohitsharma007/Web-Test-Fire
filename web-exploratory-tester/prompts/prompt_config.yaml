@@ -1,0 +1,196 @@
+# Prompt Configuration for AI-Driven Web Exploratory Testing
+# This file maps prompts to different phases of the exploration process
+
+version: "1.0"
+
+# Master exploration prompt - overall guidance
+master_prompt:
+  file: "master_exploration_prompt.md"
+  description: "Complete step-by-step guidance for entire exploration process"
+  use_cases:
+    - "System initialization"
+    - "Overall decision-making framework"
+    - "Reference for all agents"
+
+# Element selection prompt - choosing next action
+element_selection:
+  file: "element_selection_prompt.md"
+  description: "Intelligent element selection and prioritization"
+  trigger_phase: "action_planning"
+  input_required:
+    - "current_url"
+    - "page_title"
+    - "available_elements"
+    - "exploration_context"
+  output_format: "json"
+  use_cases:
+    - "When multiple elements available"
+    - "Need to choose best next action"
+    - "Prioritizing testing value"
+
+# Action validation prompt - safety checks
+action_validation:
+  file: "action_validation_prompt.md"
+  description: "Validate actions before execution for safety and value"
+  trigger_phase: "pre_execution"
+  input_required:
+    - "proposed_action"
+    - "target_element"
+    - "current_state"
+    - "previous_actions"
+  output_format: "json"
+  use_cases:
+    - "Before every action execution"
+    - "Safety verification"
+    - "Value assessment"
+
+# Insights generation prompt - analysis and reporting
+insights_generation:
+  file: "insights_generation_prompt.md"
+  description: "Generate insights and recommendations from exploration"
+  trigger_phase: "post_exploration"
+  input_required:
+    - "session_summary"
+    - "interaction_history"
+    - "application_context"
+  output_format: "markdown"
+  use_cases:
+    - "After exploration completes"
+    - "Generating final report"
+    - "Providing recommendations"
+
+# Guardrails - always enforced
+guardrails:
+  safety_rules:
+    - "No destructive actions (delete, remove, cancel order)"
+    - "No logout or session termination"
+    - "No financial transactions (purchase, checkout, payment)"
+    - "Stay within same domain"
+    - "No dangerous file downloads"
+    - "Use only sample/test data"
+
+  unsafe_keywords:
+    - "delete"
+    - "remove"
+    - "logout"
+    - "log out"
+    - "sign out"
+    - "purchase"
+    - "buy now"
+    - "checkout"
+    - "pay now"
+    - "cancel order"
+    - "unsubscribe"
+    - "close account"
+    - "deactivate"
+
+  safe_sample_data:
+    email: "test@example.com"
+    name: "John Doe"
+    password: "Test123!@#"
+    search: "test"
+    phone: "555-0100"
+    address: "123 Test Street"
+
+# Priority keywords for element selection
+priority_keywords:
+  high_priority:
+    - "login"
+    - "sign in"
+    - "search"
+    - "get started"
+    - "start"
+    - "submit"
+    - "continue"
+    - "next"
+    weight: 15-20
+
+  medium_priority:
+    - "register"
+    - "sign up"
+    - "learn more"
+    - "view details"
+    - "explore"
+    - "browse"
+    - "menu"
+    weight: 8-14
+
+  low_priority:
+    - "about"
+    - "contact"
+    - "help"
+    - "faq"
+    - "terms"
+    - "privacy"
+    weight: 3-7
+
+# Decision thresholds
+thresholds:
+  min_safety_score: 7.0  # Minimum safety score to approve action (0-10)
+  min_value_score: 5.0   # Minimum value score to approve action (0-10)
+  min_overall_score: 5.0 # Minimum combined score to proceed
+  max_consecutive_failures: 5  # Stop if this many actions fail in a row
+  max_similar_actions: 3  # Don't repeat similar action more than this
+
+# Integration settings
+integration:
+  llm_provider: "openai|anthropic|local"  # Choose AI provider
+  model: "gpt-4|claude-3-sonnet|llama-2"  # Specific model
+  temperature: 0.3  # Lower for consistent decisions
+  max_tokens: 1000  # For responses
+  timeout: 30  # seconds
+
+# Prompt templates for specific scenarios
+scenario_prompts:
+  login_flow:
+    system: "You are testing a login form. Use sample credentials test@example.com / Test123!@#"
+    steps:
+      - "Fill email field"
+      - "Fill password field"
+      - "Click submit"
+      - "Observe result (expect failure with test credentials)"
+
+  search_flow:
+    system: "You are testing search functionality. Use generic search terms."
+    steps:
+      - "Enter search term"
+      - "Submit search"
+      - "Observe results"
+      - "Click on first result"
+
+  product_browse:
+    system: "You are testing e-commerce product browsing. Explore but don't purchase."
+    steps:
+      - "View product listing"
+      - "Apply filter or sort"
+      - "Click product"
+      - "View product details"
+      - "Add to cart (safe)"
+      - "View cart"
+      - "STOP before checkout"
+
+  form_fill:
+    system: "You are testing a multi-step form. Use appropriate sample data."
+    steps:
+      - "Fill fields in order"
+      - "Validate required fields"
+      - "Click next/continue"
+      - "Complete all steps"
+      - "Submit if safe"
+
+# Logging and monitoring
+monitoring:
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  capture_screenshots: true
+  screenshot_format: "png"
+  save_session_data: true
+  session_data_format: "json"
+
+# Report generation settings
+reporting:
+  include_screenshots: true
+  max_screenshots_in_pdf: 100  # Limit to prevent huge PDFs
+  generate_insights: true
+  use_insights_prompt: true
+  report_format: "pdf"
+  include_recommendations: true
