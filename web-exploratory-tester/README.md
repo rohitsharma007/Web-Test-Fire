@@ -36,6 +36,14 @@ web-exploratory-tester/
 │   ├── state_tracker.py       # Session memory & tracking
 │   ├── popup_handler.py       # Popup/modal handling
 │   └── utils.py              # Utility functions
+├── prompts/                   # 🆕 AI guidance prompts (1,500+ lines)
+│   ├── master_exploration_prompt.md      # Complete step-by-step guidance
+│   ├── element_selection_prompt.md       # Element selection logic
+│   ├── action_validation_prompt.md       # Safety validation rules
+│   ├── insights_generation_prompt.md     # Report insights generation
+│   ├── prompt_config.yaml                # Configuration & guardrails
+│   ├── INTEGRATION_GUIDE.md              # LLM integration guide
+│   └── README.md                          # Prompts documentation
 ├── outputs/
 │   ├── screenshots/           # Captured screenshots
 │   └── reports/              # Generated PDF reports
@@ -217,6 +225,90 @@ The Explorer Agent follows these principles:
 4. **Loop Prevention**: Track and avoid duplicate interactions
 5. **Context Awareness**: Understand element purpose from text and attributes
 6. **Error Handling**: Gracefully handle failures and continue exploration
+
+## 🆕 AI Prompt System with Step-by-Step Guardrails
+
+The framework includes a comprehensive AI prompt system (1,500+ lines) that provides detailed step-by-step guidance for robust, safe testing. These prompts can be used as:
+- **Documentation**: Understand the decision-making logic
+- **LLM Integration**: Power true AI-driven exploration with GPT-4, Claude, etc.
+- **Training Material**: Learn effective exploratory testing techniques
+
+### Prompt Files
+
+**📋 Master Exploration Prompt** (`prompts/master_exploration_prompt.md`)
+- Complete 7-phase step-by-step process
+- Guardrails for every decision point
+- Special scenario handling (login, forms, e-commerce)
+- Error recovery strategies
+- 400+ lines of comprehensive guidance
+
+**🎯 Element Selection Prompt** (`prompts/element_selection_prompt.md`)
+- Intelligent element prioritization
+- Scoring algorithm with weights
+- Context-aware decision making
+- Examples for different page types
+
+**✅ Action Validation Prompt** (`prompts/action_validation_prompt.md`)
+- Multi-level safety validation
+- Value assessment framework
+- APPROVED/MODIFIED/REJECTED workflow
+- Quick validation checklist
+
+**💡 Insights Generation Prompt** (`prompts/insights_generation_prompt.md`)
+- Comprehensive analysis framework
+- Issue categorization (Critical/Medium/Low)
+- Actionable recommendations
+- Structured report generation
+
+**⚙️ Configuration** (`prompts/prompt_config.yaml`)
+- Guardrails and safety rules
+- Priority keywords and weights
+- Decision thresholds
+- Sample data specifications
+
+**📖 Integration Guide** (`prompts/INTEGRATION_GUIDE.md`)
+- Step-by-step LLM integration
+- Code examples for OpenAI, Anthropic, Ollama
+- Cost analysis and best practices
+- Complete implementation guide
+
+### Using the Prompt System
+
+**Option 1: Reference Mode (Default)**
+The framework already implements the prompt logic in code. No changes needed!
+
+**Option 2: LLM-Powered Mode (Advanced)**
+Enable true AI decision-making with language models:
+
+```bash
+# Install LLM client
+pip install openai  # or anthropic
+
+# Set API key
+export OPENAI_API_KEY=your_key_here
+
+# Run with LLM
+python main.py --url https://example.com --use-llm
+```
+
+See `prompts/INTEGRATION_GUIDE.md` for complete instructions.
+
+### Guardrails Enforced
+
+**Safety Rules:**
+- ✅ No destructive actions (delete, remove)
+- ✅ No logout or session termination
+- ✅ No financial transactions (purchase, checkout)
+- ✅ Stay within same domain
+- ✅ Use only sample test data
+
+**Decision Thresholds:**
+- Minimum safety score: 7.0/10
+- Minimum value score: 5.0/10
+- Max consecutive failures: 5
+- Max similar actions: 3
+
+For complete details, see `prompts/README.md`.
 
 ## Customization
 
