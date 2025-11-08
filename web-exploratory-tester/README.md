@@ -1,0 +1,389 @@
+# AI-Driven Web Exploratory Testing Framework
+
+An intelligent, autonomous web testing framework that explores websites like a human QA tester - observing, reasoning, and acting to discover workflows, UI behaviors, and page transitions.
+
+## Overview
+
+This framework uses a multi-agent architecture to:
+- **Autonomously navigate** websites with AI-powered decision making
+- **Intelligently interact** with UI elements (clicks, forms, navigation)
+- **Handle popups** and modals automatically
+- **Capture screenshots** at every meaningful step
+- **Generate comprehensive PDF reports** documenting the entire exploration
+
+### Key Features
+
+- **Intelligent Navigation**: AI reasoning to select and interact with elements
+- **Safe Exploration**: Avoids destructive actions (delete, logout, purchase)
+- **Automatic Popup Handling**: Manages cookie banners, dialogs, and modals
+- **Screenshot Documentation**: Visual evidence for every action
+- **PDF Report Generation**: Professional reports with step-by-step documentation
+- **State Tracking**: Prevents loops and duplicate interactions
+- **Customizable**: Configurable depth, steps, and exploration strategies
+
+## Architecture
+
+```
+web-exploratory-tester/
+├── main.py                    # Entry point
+├── agents/                    # AI agents
+│   ├── explorer_agent.py      # Core decision-making brain
+│   ├── screenshot_agent.py    # Screenshot capture & metadata
+│   └── report_agent.py        # PDF report generation
+├── core/                      # Core functionality
+│   ├── browser_manager.py     # Browser lifecycle management
+│   ├── action_handler.py      # UI interaction execution
+│   ├── state_tracker.py       # Session memory & tracking
+│   ├── popup_handler.py       # Popup/modal handling
+│   └── utils.py              # Utility functions
+├── outputs/
+│   ├── screenshots/           # Captured screenshots
+│   └── reports/              # Generated PDF reports
+├── logs/                      # Execution logs
+└── requirements.txt           # Python dependencies
+```
+
+## Installation
+
+### Prerequisites
+
+- Python 3.11 or higher
+- pip (Python package manager)
+
+### Setup
+
+1. **Clone or download the framework**:
+   ```bash
+   cd web-exploratory-tester
+   ```
+
+2. **Install Python dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Install Playwright browsers**:
+   ```bash
+   playwright install chromium
+   ```
+
+That's it! You're ready to run exploratory tests.
+
+## Usage
+
+### Basic Usage
+
+Test any website with a single command:
+
+```bash
+python main.py --url https://example.com
+```
+
+### Advanced Options
+
+```bash
+python main.py --url https://example.com \
+    --max-steps 100 \
+    --depth 5 \
+    --headless True
+```
+
+### Command-Line Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--url` | Target URL to explore (required) | - |
+| `--max-steps` | Maximum exploration steps | 50 |
+| `--depth` | Maximum navigation depth | 3 |
+| `--headless` | Run browser in headless mode | True |
+| `--output` | Base directory for outputs | outputs |
+
+### Examples
+
+**Basic exploration:**
+```bash
+python main.py --url https://demo.testfire.net
+```
+
+**Extended exploration with visible browser:**
+```bash
+python main.py --url https://example.com --max-steps 100 --headless False
+```
+
+**Deep exploration:**
+```bash
+python main.py --url https://example.com --depth 5 --max-steps 200
+```
+
+## Output
+
+After exploration, the framework generates:
+
+### 1. Screenshots
+- Location: `outputs/screenshots/`
+- Format: `step_NNN_action_description.png`
+- One screenshot per action
+
+### 2. PDF Report
+- Location: `outputs/reports/`
+- Filename: `exploration_report_[domain]_[timestamp].pdf`
+- Contains:
+  - Cover page with target URL and date
+  - Summary statistics
+  - Step-by-step documentation with screenshots
+  - Observations and recommendations
+
+### 3. Session Data
+- Location: `logs/session_data.json`
+- Complete interaction history in JSON format
+
+### 4. Execution Logs
+- Location: `logs/exploration.log`
+- Detailed execution log with timestamps
+
+## How It Works
+
+### 1. Initialization
+- Starts Playwright browser
+- Sets up agents (Explorer, Screenshot, Report)
+- Initializes state tracker
+
+### 2. Exploration Loop
+The Explorer Agent:
+1. Loads the target URL
+2. Scans for visible interactive elements
+3. Uses AI reasoning to select the best action:
+   - Prioritizes navigation elements
+   - Fills forms with sample data
+   - Avoids destructive actions
+   - Skips already-visited elements
+4. Executes the action
+5. Captures screenshot
+6. Records the interaction
+7. Repeats until max steps or no more actions
+
+### 3. Intelligent Decision Making
+
+The framework reasons like a human QA tester:
+
+**High Priority Actions:**
+- Login, Sign In
+- Get Started, Continue, Next
+- Search, Submit
+- Main navigation elements
+
+**Medium Priority:**
+- Register, Sign Up
+- Learn More, View Details
+- Explore, Browse
+
+**Skipped Actions:**
+- Logout, Delete, Remove
+- Purchase, Checkout, Pay
+- Destructive operations
+
+### 4. Form Handling
+
+Automatically fills forms with realistic data:
+- Email fields: `test@example.com`
+- Name fields: `John Doe`, `Jane Smith`
+- Search fields: `test`, `search`, `demo`
+- Password fields: `Test123!`
+
+### 5. Popup Management
+
+Automatically handles:
+- Cookie consent banners → Click "Accept"
+- JavaScript alerts → Accept safe dialogs
+- Modals and overlays → Close if safe
+- Permission requests → Handle appropriately
+
+### 6. Report Generation
+
+Creates a professional PDF with:
+- Executive summary
+- Exploration statistics
+- Step-by-step screenshots
+- Failed interactions
+- Observations and recommendations
+
+## AI Reasoning Rules
+
+The Explorer Agent follows these principles:
+
+1. **Safety First**: Never perform destructive actions
+2. **Intelligent Navigation**: Prioritize elements that lead to new content
+3. **Form Intelligence**: Fill inputs with appropriate sample data
+4. **Loop Prevention**: Track and avoid duplicate interactions
+5. **Context Awareness**: Understand element purpose from text and attributes
+6. **Error Handling**: Gracefully handle failures and continue exploration
+
+## Customization
+
+### Extending the Framework
+
+**Add custom sample data:**
+Edit `core/action_handler.py` and modify:
+```python
+SAMPLE_EMAILS = ['custom@email.com']
+SAMPLE_NAMES = ['Custom Name']
+```
+
+**Adjust element priorities:**
+Edit `agents/explorer_agent.py` and modify:
+```python
+PRIORITY_KEYWORDS = {
+    'high': ['your', 'keywords'],
+    # ...
+}
+```
+
+**Change screenshot settings:**
+In `main.py`:
+```python
+self.screenshot_agent = ScreenshotAgent(
+    full_page=True,  # Capture full page
+    # ...
+)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: "playwright not found"**
+```bash
+pip install playwright
+playwright install chromium
+```
+
+**Issue: Browser fails to start**
+- Check if running in environment with display (for non-headless)
+- Try with `--headless True` flag
+
+**Issue: No elements found**
+- Website might use JavaScript frameworks that load slowly
+- Try increasing wait times in `browser_manager.py`
+
+**Issue: PDF generation fails**
+```bash
+pip install --upgrade fpdf2
+```
+
+### Debug Mode
+
+Enable verbose logging by editing `main.py`:
+```python
+self.logger = setup_logger("WebExploratoryTester", log_file, level=logging.DEBUG)
+```
+
+## Performance Considerations
+
+- **Headless mode**: Faster execution, lower resource usage
+- **Screenshot optimization**: Viewport-only screenshots reduce file size
+- **Rate limiting**: Built-in delays prevent overwhelming servers
+- **Memory management**: Old screenshots auto-cleanup available
+
+## Security & Ethics
+
+### Important Guidelines
+
+✅ **Do:**
+- Test authorized websites only
+- Respect `robots.txt`
+- Use for QA, testing, and security research
+- Test on development/staging environments
+
+❌ **Don't:**
+- Test unauthorized websites
+- Perform credential brute-forcing
+- Create denial-of-service conditions
+- Exploit discovered vulnerabilities without permission
+
+This tool is for **authorized testing only**. Always obtain proper permission before testing any website.
+
+## Limitations
+
+- **JavaScript-heavy sites**: May have timing issues with dynamic content
+- **Authentication**: Does not handle complex login flows automatically
+- **CAPTCHAs**: Cannot bypass CAPTCHA challenges
+- **Rate limiting**: May trigger rate limits on some sites
+- **Same-domain only**: Exploration limited to starting domain
+
+## Future Enhancements
+
+Potential improvements:
+- [ ] Integration with LLM APIs for enhanced AI reasoning
+- [ ] Vision model integration for visual anomaly detection
+- [ ] Support for multi-domain exploration
+- [ ] HTML diff comparison for before/after states
+- [ ] Interactive replay dashboard
+- [ ] Custom plugin system
+- [ ] Authentication flow handling
+- [ ] Performance metrics collection
+
+## Contributing
+
+This is a self-contained framework. To extend or modify:
+
+1. Fork the codebase
+2. Create feature branches
+3. Add tests for new functionality
+4. Submit pull requests
+
+## License
+
+This framework is provided as-is for educational and authorized testing purposes.
+
+## Support
+
+For issues, questions, or enhancements:
+1. Check the troubleshooting section
+2. Review execution logs in `logs/`
+3. Examine the generated reports for insights
+
+## Example Run
+
+```bash
+$ python main.py --url https://demo.testfire.net
+
+================================================================================
+AI-Driven Web Exploratory Testing Framework
+================================================================================
+Target URL: https://demo.testfire.net
+Max Steps: 50
+Max Depth: 3
+Headless Mode: True
+================================================================================
+[INFO] Starting browser...
+[INFO] Browser started successfully
+[INFO] Starting exploration...
+[INFO] Navigating to: https://demo.testfire.net
+[INFO] Screenshot captured: step_001_click_login.png (245 KB)
+[INFO] [Step 1] CLICK: Clicked element: Login
+[INFO] Screenshot captured: step_002_input_username.png (238 KB)
+[INFO] [Step 2] INPUT: Entered text: test@example.com
+...
+================================================================================
+Exploration Complete!
+Total Steps: 37
+URLs Visited: 12
+Duration: 2m 15s
+================================================================================
+[INFO] Generating PDF report...
+================================================================================
+✓ Report generated successfully!
+✓ Report location: outputs/reports/exploration_report_demo_testfire_net_2025-11-08_14-23-45.pdf
+================================================================================
+```
+
+## Credits
+
+Built with:
+- **Playwright** - Browser automation
+- **FPDF2** - PDF generation
+- **Python 3.11+** - Core language
+
+---
+
+**Made for intelligent, autonomous web exploration and testing.**
