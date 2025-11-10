@@ -1,0 +1,8 @@
+# Test artifacts generated when running tests from root directory
+logs/
+outputs/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
