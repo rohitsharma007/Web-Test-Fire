@@ -70,6 +70,9 @@ class BrowserManager:
             self.popup_handler = PopupHandler(self.logger)
             await self.popup_handler.setup_dialog_handler(self.page)
 
+            # Give browser time to fully initialize
+            await asyncio.sleep(0.5)
+
             self.logger.info("Browser started successfully")
 
         except Exception as e:
@@ -91,11 +94,39 @@ class BrowserManager:
             raise RuntimeError("Browser not started. Call start() first.")
 
         try:
-            self.logger.info(f"Navigating to: {url}")
-            await self.page.goto(url, timeout=timeout, wait_until='domcontentloaded')
+            # Verify page/context/browser are still open
+            if self.page.is_closed():
+                self.logger.error("Page was closed before navigation")
+                return False
 
-            # Wait for page to stabilize
-            await self.page.wait_for_load_state('networkidle', timeout=10000)
+            if self.context and hasattr(self.context, '_impl_obj'):
+                # Context is valid
+                pass
+            else:
+                self.logger.error("Browser context is invalid")
+                return False
+
+            self.logger.info(f"Navigating to: {url}")
+
+            # Navigate with retry logic
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    await self.page.goto(url, timeout=timeout, wait_until='domcontentloaded')
+                    break
+                except Exception as nav_error:
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Navigation attempt {attempt + 1} failed, retrying...")
+                        await asyncio.sleep(1)
+                    else:
+                        raise nav_error
+
+            # Wait for page to stabilize with shorter timeout
+            try:
+                await self.page.wait_for_load_state('networkidle', timeout=5000)
+            except Exception:
+                # Network idle timeout is not critical, continue anyway
+                self.logger.debug("Network idle timeout, continuing...")
 
             # Handle any popups that appear
             if self.popup_handler:
@@ -339,14 +370,29 @@ class BrowserManager:
     async def close(self):
         """Close browser and cleanup resources."""
         try:
-            if self.page:
-                await self.page.close()
+            if self.page and not self.page.is_closed():
+                try:
+                    await self.page.close()
+                except Exception as e:
+                    self.logger.debug(f"Page close error (may already be closed): {e}")
+
             if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
+                try:
+                    await self.context.close()
+                except Exception as e:
+                    self.logger.debug(f"Context close error (may already be closed): {e}")
+
+            if self.browser and self.browser.is_connected():
+                try:
+                    await self.browser.close()
+                except Exception as e:
+                    self.logger.debug(f"Browser close error (may already be closed): {e}")
+
             if self.playwright:
-                await self.playwright.stop()
+                try:
+                    await self.playwright.stop()
+                except Exception as e:
+                    self.logger.debug(f"Playwright stop error: {e}")
 
             self.logger.info("Browser closed successfully")
 
