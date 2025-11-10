@@ -48,11 +48,24 @@ class BrowserManager:
             self.logger.info("Starting browser...")
             self.playwright = await async_playwright().start()
 
-            # Launch browser with options
+            # Launch browser with enhanced options for stability
+            launch_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',  # Overcome limited resource problems
+                '--disable-gpu',  # Disable GPU hardware acceleration
+                '--no-first-run',
+                '--no-default-browser-check',
+            ]
+
             self.browser = await self.playwright.chromium.launch(
                 headless=self.headless,
-                args=['--disable-blink-features=AutomationControlled']
+                args=launch_args,
+                timeout=60000  # Increase launch timeout
             )
+
+            # Verify browser is connected
+            if not self.browser.is_connected():
+                raise RuntimeError("Browser launched but not connected")
 
             # Create context with viewport
             self.context = await self.browser.new_context(
@@ -60,24 +73,61 @@ class BrowserManager:
                     'width': self.viewport_width,
                     'height': self.viewport_height
                 },
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                ignore_https_errors=True  # Ignore HTTPS errors
             )
 
             # Create page
             self.page = await self.context.new_page()
+
+            # Set up page close listener for debugging
+            self.page.on("close", lambda: self.logger.warning("Page was closed unexpectedly"))
 
             # Set up popup handler
             self.popup_handler = PopupHandler(self.logger)
             await self.popup_handler.setup_dialog_handler(self.page)
 
             # Give browser time to fully initialize
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.0)  # Increased from 0.5s to 1.0s
+
+            # Verify page is still open after initialization
+            if self.page.is_closed():
+                raise RuntimeError("Page closed during initialization")
+
+            # Verify browser is still connected
+            if not self.browser.is_connected():
+                raise RuntimeError("Browser disconnected during initialization")
 
             self.logger.info("Browser started successfully")
 
         except Exception as e:
             self.logger.error(f"Failed to start browser: {e}")
+            # Clean up on failure
+            await self._cleanup_on_error()
             raise
+
+    async def _cleanup_on_error(self):
+        """Clean up resources after an error."""
+        try:
+            if self.page and not self.page.is_closed():
+                await self.page.close()
+        except:
+            pass
+        try:
+            if self.context:
+                await self.context.close()
+        except:
+            pass
+        try:
+            if self.browser:
+                await self.browser.close()
+        except:
+            pass
+        try:
+            if self.playwright:
+                await self.playwright.stop()
+        except:
+            pass
 
     async def navigate(self, url: str, timeout: int = 30000) -> bool:
         """
@@ -94,34 +144,71 @@ class BrowserManager:
             raise RuntimeError("Browser not started. Call start() first.")
 
         try:
-            # Verify page/context/browser are still open
+            # Comprehensive pre-navigation validation
+            if not self.browser or not self.browser.is_connected():
+                self.logger.error("Browser is not connected")
+                return False
+
             if self.page.is_closed():
                 self.logger.error("Page was closed before navigation")
                 return False
 
-            if self.context and hasattr(self.context, '_impl_obj'):
-                # Context is valid
-                pass
-            else:
-                self.logger.error("Browser context is invalid")
+            if not self.context:
+                self.logger.error("Browser context is None")
                 return False
 
             self.logger.info(f"Navigating to: {url}")
 
             # Navigate with retry logic
-            max_retries = 2
+            max_retries = 3  # Increased from 2 to 3
             for attempt in range(max_retries):
                 try:
-                    await self.page.goto(url, timeout=timeout, wait_until='domcontentloaded')
+                    # Double-check page is still open before each attempt
+                    if self.page.is_closed():
+                        self.logger.error(f"Page closed before attempt {attempt + 1}")
+                        return False
+
+                    # Perform navigation with multiple wait strategies
+                    response = await self.page.goto(
+                        url,
+                        timeout=timeout,
+                        wait_until='domcontentloaded'
+                    )
+
+                    # Check if navigation was successful
+                    if response:
+                        self.logger.debug(f"Navigation response status: {response.status}")
+
                     break
+
                 except Exception as nav_error:
+                    error_msg = str(nav_error)
+                    self.logger.warning(f"Navigation attempt {attempt + 1}/{max_retries} failed: {error_msg}")
+
+                    # Check if it's a fatal error (browser closed)
+                    if "closed" in error_msg.lower():
+                        self.logger.error("Browser/page closed during navigation - fatal error")
+                        return False
+
                     if attempt < max_retries - 1:
-                        self.logger.warning(f"Navigation attempt {attempt + 1} failed, retrying...")
-                        await asyncio.sleep(1)
+                        # Wait before retry with exponential backoff
+                        wait_time = (attempt + 1) * 1.5
+                        self.logger.info(f"Waiting {wait_time}s before retry...")
+                        await asyncio.sleep(wait_time)
+
+                        # Verify browser is still alive before retrying
+                        if not self.browser.is_connected() or self.page.is_closed():
+                            self.logger.error("Browser/page no longer available for retry")
+                            return False
                     else:
                         raise nav_error
 
             # Wait for page to stabilize with shorter timeout
+            try:
+                await self.page.wait_for_load_state('domcontentloaded', timeout=5000)
+            except Exception as e:
+                self.logger.debug(f"DOM content load timeout: {e}")
+
             try:
                 await self.page.wait_for_load_state('networkidle', timeout=5000)
             except Exception:
@@ -132,10 +219,21 @@ class BrowserManager:
             if self.popup_handler:
                 await self.popup_handler.handle_all_popups(self.page)
 
+            self.logger.info(f"Successfully navigated to: {url}")
             return True
 
         except Exception as e:
             self.logger.error(f"Navigation failed: {e}")
+
+            # Log browser state for debugging
+            try:
+                if self.browser:
+                    self.logger.error(f"Browser connected: {self.browser.is_connected()}")
+                if self.page:
+                    self.logger.error(f"Page closed: {self.page.is_closed()}")
+            except:
+                pass
+
             return False
 
     async def get_current_url(self) -> str:
@@ -253,6 +351,15 @@ class BrowserManager:
             return []
 
         try:
+            # Check if page/browser is still alive
+            if self.page.is_closed():
+                self.logger.warning("Page is closed, cannot get elements")
+                return []
+
+            if not self.browser or not self.browser.is_connected():
+                self.logger.warning("Browser is disconnected, cannot get elements")
+                return []
+
             # JavaScript to extract visible interactive elements
             elements = await self.page.evaluate("""
                 () => {
@@ -310,7 +417,11 @@ class BrowserManager:
             return elements
 
         except Exception as e:
-            self.logger.error(f"Failed to get visible elements: {e}")
+            error_msg = str(e)
+            if "crashed" in error_msg.lower() or "closed" in error_msg.lower():
+                self.logger.error(f"Browser/page crashed or closed: {e}")
+            else:
+                self.logger.error(f"Failed to get visible elements: {e}")
             return []
 
     async def take_screenshot(self, filepath: str, full_page: bool = False) -> bool:
@@ -328,10 +439,23 @@ class BrowserManager:
             return False
 
         try:
+            # Check if page/browser is still alive before screenshot
+            if self.page.is_closed():
+                self.logger.warning("Page is closed, cannot take screenshot")
+                return False
+
+            if not self.browser or not self.browser.is_connected():
+                self.logger.warning("Browser is disconnected, cannot take screenshot")
+                return False
+
             await self.page.screenshot(path=filepath, full_page=full_page)
             return True
         except Exception as e:
-            self.logger.error(f"Screenshot failed: {e}")
+            error_msg = str(e)
+            if "crashed" in error_msg.lower() or "closed" in error_msg.lower():
+                self.logger.error(f"Browser/page crashed or closed during screenshot: {e}")
+            else:
+                self.logger.error(f"Screenshot failed: {e}")
             return False
 
     async def wait_for_navigation(self, timeout: int = 10000):
