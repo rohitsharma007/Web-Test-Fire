@@ -94,8 +94,12 @@ class BrowserManager:
             self.logger.info(f"Navigating to: {url}")
             await self.page.goto(url, timeout=timeout, wait_until='domcontentloaded')
 
-            # Wait for page to stabilize
-            await self.page.wait_for_load_state('networkidle', timeout=10000)
+            # Wait for page to stabilize (but don't fail if it times out)
+            try:
+                await self.page.wait_for_load_state('networkidle', timeout=15000)
+            except Exception as e:
+                self.logger.debug(f"Network idle timeout (page may still be loading): {e}")
+                # Continue anyway - page is loaded enough to interact with
 
             # Handle any popups that appear
             if self.popup_handler:
@@ -338,20 +342,48 @@ class BrowserManager:
 
     async def close(self):
         """Close browser and cleanup resources."""
+        errors = []
+
         try:
             if self.page:
-                await self.page.close()
-            if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
-            if self.playwright:
-                await self.playwright.stop()
-
-            self.logger.info("Browser closed successfully")
-
+                try:
+                    await self.page.close()
+                except Exception as e:
+                    errors.append(f"page close: {e}")
         except Exception as e:
-            self.logger.error(f"Error closing browser: {e}")
+            errors.append(f"page check: {e}")
+
+        try:
+            if self.context:
+                try:
+                    await self.context.close()
+                except Exception as e:
+                    errors.append(f"context close: {e}")
+        except Exception as e:
+            errors.append(f"context check: {e}")
+
+        try:
+            if self.browser:
+                try:
+                    await self.browser.close()
+                except Exception as e:
+                    errors.append(f"browser close: {e}")
+        except Exception as e:
+            errors.append(f"browser check: {e}")
+
+        try:
+            if self.playwright:
+                try:
+                    await self.playwright.stop()
+                except Exception as e:
+                    errors.append(f"playwright stop: {e}")
+        except Exception as e:
+            errors.append(f"playwright check: {e}")
+
+        if errors:
+            self.logger.warning(f"Browser close completed with warnings: {'; '.join(errors)}")
+        else:
+            self.logger.info("Browser closed successfully")
 
     async def __aenter__(self):
         """Async context manager entry."""

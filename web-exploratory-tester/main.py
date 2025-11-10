@@ -236,8 +236,8 @@ For more information, see README.md
     parser.add_argument(
         '--headless',
         type=lambda x: x.lower() in ('true', '1', 'yes'),
-        default=True,
-        help='Run browser in headless mode (default: True)'
+        default=False,
+        help='Run browser in headless mode (default: False)'
     )
 
     parser.add_argument(
