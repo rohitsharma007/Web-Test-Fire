@@ -39,7 +39,7 @@ class WebExploratoryTester:
         url: str,
         max_steps: int = 50,
         depth: int = 3,
-        headless: bool = True,
+        headless: bool = False,
         output_base: str = "outputs",
         username: str = None,
         password: str = None
@@ -216,7 +216,7 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic exploration
+  # Basic exploration (browser visible by default)
   python main.py --url https://example.com
 
   # With custom steps and depth
@@ -225,8 +225,8 @@ Examples:
   # With automatic login (credentials provided)
   python main.py --url https://opensource-demo.orangehrmlive.com --username Admin --password admin123
 
-  # Non-headless mode
-  python main.py --url https://example.com --headless False
+  # Run in headless mode (browser hidden)
+  python main.py --url https://example.com --headless True
 
 For more information, see README.md
         """
@@ -256,8 +256,8 @@ For more information, see README.md
     parser.add_argument(
         '--headless',
         type=lambda x: x.lower() in ('true', '1', 'yes'),
-        default=True,
-        help='Run browser in headless mode (default: True)'
+        default=False,
+        help='Run browser in headless mode (default: False - browser visible)'
     )
 
     parser.add_argument(

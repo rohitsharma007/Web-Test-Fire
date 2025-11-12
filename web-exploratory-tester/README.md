@@ -104,7 +104,7 @@ python main.py --url https://example.com \
 | `--url` | Target URL to explore (required) | - |
 | `--max-steps` | Maximum exploration steps | 50 |
 | `--depth` | Maximum navigation depth | 3 |
-| `--headless` | Run browser in headless mode | True |
+| `--headless` | Run browser in headless mode | False (browser visible) |
 | `--output` | Base directory for outputs | outputs |
 | `--username` | Username for automatic login (optional) | - |
 | `--password` | Password for automatic login (optional) | - |
@@ -129,9 +129,9 @@ python3 main.py --url https://example.com --max-steps 50
 # Works normally, no login attempt
 ```
 
-**Extended exploration with visible browser:**
+**Extended exploration (headless mode for faster execution):**
 ```bash
-python main.py --url https://example.com --max-steps 100 --headless False
+python main.py --url https://example.com --max-steps 100 --headless True
 ```
 
 **Deep exploration:**
@@ -410,8 +410,9 @@ playwright install chromium
 ```
 
 **Issue: Browser fails to start**
-- Check if running in environment with display (for non-headless)
-- Try with `--headless True` flag
+- Check if running in environment without display (servers, Docker, etc.)
+- If no display available, use `--headless True` flag
+- On systems with display, browser will open visibly by default
 
 **Issue: No elements found**
 - Website might use JavaScript frameworks that load slowly

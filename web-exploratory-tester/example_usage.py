@@ -25,7 +25,7 @@ async def example_basic_test():
         url="https://example.com",
         max_steps=25,
         depth=2,
-        headless=True
+        headless=False  # Browser visible by default
     )
 
     success = await tester.run()
@@ -42,7 +42,7 @@ async def example_extended_test():
         url="https://demo.testfire.net",
         max_steps=100,
         depth=5,
-        headless=True,
+        headless=False,  # Browser visible by default
         output_base="outputs/demo_testfire"
     )
 

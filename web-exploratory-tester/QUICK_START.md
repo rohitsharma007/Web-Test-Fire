@@ -21,9 +21,10 @@ Python 3.14 is very new and some dependencies (greenlet, playwright) don't have 
 
 ## Running the Framework
 
-### Basic Usage with Python 3.11
+### Basic Usage with Python 3.11 (Browser Visible)
 
 ```bash
+# Browser will open visibly by default so you can watch the execution
 python3.11 main.py --url https://example.com
 ```
 
@@ -34,9 +35,10 @@ python3.11 main.py --url https://opensource-demo.orangehrmlive.com \
   --username Admin --password admin123 --max-steps 25
 ```
 
-### Extended Exploration
+### Extended Exploration (Headless for Speed)
 
 ```bash
+# Use --headless True for faster execution without browser UI
 python3.11 main.py --url https://example.com \
   --max-steps 100 --depth 5 --headless True
 ```
@@ -64,7 +66,7 @@ The framework now intelligently:
 ## Example Output
 
 ```bash
-$ python3.11 main.py --url http://example.com --max-steps 3 --headless True
+$ python3.11 main.py --url http://example.com --max-steps 3
 
 [INFO] ================================================================================
 [INFO] AI-Driven Web Exploratory Testing Framework
@@ -72,7 +74,7 @@ $ python3.11 main.py --url http://example.com --max-steps 3 --headless True
 [INFO] Target URL: http://example.com
 [INFO] Max Steps: 3
 [INFO] Max Depth: 3
-[INFO] Headless Mode: True
+[INFO] Headless Mode: False
 [INFO] ================================================================================
 [INFO] Starting browser...
 [INFO] Browser started successfully
@@ -109,11 +111,13 @@ Install Playwright browsers:
 python3.11 -m playwright install chromium
 ```
 
-### If browser fails to start in non-headless mode
-On systems without a display server, always use `--headless True`:
+### If browser fails to start (no display available)
+On systems without a display server (servers, Docker, CI/CD), use `--headless True`:
 ```bash
 python3.11 main.py --url https://example.com --headless True
 ```
+
+**Note:** The framework now runs with browser visible by default (headed mode) so you can watch the execution flow. Use `--headless True` only when needed.
 
 ## Network Connectivity
 

@@ -17,7 +17,7 @@ class BrowserManager:
 
     def __init__(
         self,
-        headless: bool = True,
+        headless: bool = False,
         viewport_width: int = 1920,
         viewport_height: int = 1080,
         logger: Optional[logging.Logger] = None
