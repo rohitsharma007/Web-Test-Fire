@@ -441,114 +441,120 @@ class ExplorerAgent:
 
     async def _perform_login(self) -> bool:
         """
-        Perform automatic login using provided credentials.
+        Perform intelligent automatic login with multiple retry strategies.
 
         Returns:
             True if login successful, False otherwise
         """
         self.login_attempted = True
+        max_login_attempts = 3  # Try up to 3 times with different strategies
 
+        for attempt in range(1, max_login_attempts + 1):
+            try:
+                self.logger.info(f"Login attempt {attempt}/{max_login_attempts} with username: {self.username}")
+
+                # Strategy: Use JavaScript to find fields more reliably
+                login_result = await self._attempt_login_with_js_strategy(attempt)
+
+                if login_result:
+                    self.login_successful = True
+                    return True
+
+                # If first attempt failed, wait and retry with different approach
+                if attempt < max_login_attempts:
+                    self.logger.warning(f"Login attempt {attempt} failed - retrying with different strategy...")
+                    await self.browser.page.wait_for_timeout(2000)
+
+                    # Try to reload the login page for fresh attempt
+                    try:
+                        current_url = await self.browser.get_current_url()
+                        await self.browser.navigate(current_url)
+                    except:
+                        pass
+
+            except Exception as e:
+                self.logger.error(f"Login attempt {attempt} failed with error: {e}")
+                if attempt < max_login_attempts:
+                    await self.browser.page.wait_for_timeout(2000)
+                continue
+
+        self.logger.error(f"All {max_login_attempts} login attempts failed")
+        return False
+
+    async def _attempt_login_with_js_strategy(self, attempt: int) -> bool:
+        """
+        Attempt login using JavaScript-based field detection with multiple strategies.
+
+        Args:
+            attempt: Attempt number (1, 2, or 3) to use different strategies
+
+        Returns:
+            True if login successful, False otherwise
+        """
         try:
-            self.logger.info(f"Attempting login with username: {self.username}")
+            # Wait for page to be ready
+            await self.browser.page.wait_for_timeout(1500)
 
-            # Get all visible elements
-            elements = await self.browser.get_visible_elements()
-
-            if not elements:
-                self.logger.error("No elements found for login")
-                return False
-
-            # Find username/email field
-            username_field = None
-            for el in elements:
-                text_lower = el.get('text', '').lower()
-                input_type = el.get('type', '').lower()
-                tag = el.get('tag', '').lower()
-
-                if tag == 'input' and (input_type in ['text', 'email'] or
-                    any(kw in text_lower for kw in ['username', 'user', 'email', 'login'])):
-                    username_field = el
-                    break
-
-            # Find password field
-            password_field = None
-            for el in elements:
-                if el.get('type') == 'password':
-                    password_field = el
-                    break
-
-            if not username_field:
-                self.logger.error("Username field not found")
-                return False
-
-            if not password_field:
-                self.logger.error("Password field not found")
-                return False
-
-            self.logger.info("Found login form fields - filling credentials...")
-
-            # Fill username
-            username_success = await self.browser.type_text(
-                username_field['selector'],
-                self.username
-            )
-            if not username_success:
-                self.logger.error("Failed to enter username")
-                return False
-
-            self.logger.info("Username entered successfully")
-            await self.browser.page.wait_for_timeout(500)
-
-            # Fill password
-            password_success = await self.browser.type_text(
-                password_field['selector'],
-                self.password
-            )
-            if not password_success:
-                self.logger.error("Failed to enter password")
-                return False
-
-            self.logger.info("Password entered successfully")
-            await self.browser.page.wait_for_timeout(500)
-
-            # Find and click submit button
-            submit_button = None
-            for el in elements:
-                text_lower = el.get('text', '').lower()
-                tag = el.get('tag', '').lower()
-                input_type = el.get('type', '').lower()
-
-                if (tag == 'button' or input_type == 'submit') and \
-                   any(kw in text_lower for kw in ['login', 'sign in', 'submit', 'log in']):
-                    submit_button = el
-                    break
-
-            if not submit_button:
-                self.logger.warning("Submit button not found - trying Enter key")
-                # Press Enter to submit
-                await self.browser.page.keyboard.press('Enter')
+            # Strategy 1: Direct JavaScript selector approach (most reliable)
+            if attempt == 1:
+                self.logger.info("Strategy 1: Using JavaScript to find fields by attributes")
+                username_selector = await self._find_username_field_js()
+                password_selector = await self._find_password_field_js()
+            # Strategy 2: Try by placeholder and label text
+            elif attempt == 2:
+                self.logger.info("Strategy 2: Using placeholder and label matching")
+                username_selector = await self._find_field_by_placeholder_or_label('username')
+                password_selector = await self._find_field_by_placeholder_or_label('password')
+            # Strategy 3: Try by index (first text input, first password input)
             else:
-                self.logger.info(f"Clicking submit button: {submit_button['text']}")
-                await self.browser.click_element(submit_button['selector'])
+                self.logger.info("Strategy 3: Using field index (first text/password inputs)")
+                username_selector = await self._find_first_input_by_type('text')
+                password_selector = await self._find_first_input_by_type('password')
+
+            if not username_selector:
+                self.logger.error(f"Username field not found (Strategy {attempt})")
+                return False
+
+            if not password_selector:
+                self.logger.error(f"Password field not found (Strategy {attempt})")
+                return False
+
+            self.logger.info(f"Found login fields with Strategy {attempt} - filling credentials...")
+            self.logger.debug(f"Username selector: {username_selector}")
+            self.logger.debug(f"Password selector: {password_selector}")
+
+            # Clear fields first
+            await self._clear_and_fill_field(username_selector, self.username)
+            self.logger.info("✓ Username entered successfully")
+            await self.browser.page.wait_for_timeout(800)
+
+            await self._clear_and_fill_field(password_selector, self.password)
+            self.logger.info("✓ Password entered successfully")
+            await self.browser.page.wait_for_timeout(800)
+
+            # Find and click submit button using multiple strategies
+            submit_clicked = await self._find_and_click_submit_button(attempt)
+
+            if not submit_clicked:
+                self.logger.warning("Submit button not found - pressing Enter key")
+                await self.browser.page.keyboard.press('Enter')
 
             # Wait for navigation or page change
+            self.logger.info("Waiting for login to process...")
             await self.browser.page.wait_for_timeout(3000)
 
-            # Check if login was successful by looking for login page indicators
-            current_url = await self.browser.get_current_url()
-            page_title = await self.browser.get_page_title()
-
-            # If we're still on a login page, login likely failed
+            # Verify login success
             is_still_login = await self._is_login_page()
 
             if not is_still_login:
-                self.logger.info(f"Login successful! Now at: {current_url}")
+                current_url = await self.browser.get_current_url()
+                self.logger.info(f"✓ Login successful! Now at: {current_url}")
 
-                # Capture screenshot after login
+                # Capture screenshot after successful login
                 await self.screenshot_agent.capture(
                     self.browser,
                     step=1,
-                    action_description="after_login",
+                    action_description="successful_login",
                     timestamp=get_iso_timestamp()
                 )
 
@@ -560,17 +566,213 @@ class ExplorerAgent:
                     url_before=current_url,
                     url_after=await self.browser.get_current_url(),
                     screenshot_path=None,
-                    notes=f"Automatic login successful with username: {self.username}",
+                    notes=f"Automatic login successful (Strategy {attempt})",
                     success=True
                 )
 
                 return True
             else:
-                self.logger.warning("Still on login page after submission - login may have failed")
+                self.logger.warning(f"Still on login page after submission (Strategy {attempt})")
                 return False
 
         except Exception as e:
-            self.logger.error(f"Login failed with error: {e}")
+            self.logger.error(f"Login strategy {attempt} failed: {e}")
+            return False
+
+    async def _find_username_field_js(self) -> Optional[str]:
+        """Find username field using JavaScript with multiple selectors."""
+        try:
+            selector = await self.browser.page.evaluate("""
+                () => {
+                    // Try multiple strategies to find username field
+                    let field = null;
+
+                    // Strategy 1: By name attribute
+                    field = document.querySelector('input[name*="username" i]') ||
+                            document.querySelector('input[name*="user" i]') ||
+                            document.querySelector('input[name*="email" i]') ||
+                            document.querySelector('input[name*="login" i]');
+                    if (field) return `input[name="${field.name}"]`;
+
+                    // Strategy 2: By id attribute
+                    field = document.querySelector('input[id*="username" i]') ||
+                            document.querySelector('input[id*="user" i]') ||
+                            document.querySelector('input[id*="email" i]') ||
+                            document.querySelector('input[id*="login" i]');
+                    if (field) return `input[id="${field.id}"]`;
+
+                    // Strategy 3: By placeholder
+                    field = document.querySelector('input[placeholder*="username" i]') ||
+                            document.querySelector('input[placeholder*="user" i]') ||
+                            document.querySelector('input[placeholder*="email" i]');
+                    if (field) return `input[placeholder*="${field.placeholder}"]`;
+
+                    // Strategy 4: By autocomplete attribute
+                    field = document.querySelector('input[autocomplete="username"]') ||
+                            document.querySelector('input[autocomplete="email"]');
+                    if (field) return `input[autocomplete="${field.autocomplete}"]`;
+
+                    // Strategy 5: First text input before password field
+                    const passwordField = document.querySelector('input[type="password"]');
+                    if (passwordField) {
+                        const allInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input:not([type])'));
+                        for (let input of allInputs) {
+                            if (input.compareDocumentPosition(passwordField) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                                if (input.id) return `input[id="${input.id}"]`;
+                                if (input.name) return `input[name="${input.name}"]`;
+                                return `input[type="${input.type || 'text'}"]`;
+                            }
+                        }
+                    }
+
+                    return null;
+                }
+            """)
+            return selector
+        except Exception as e:
+            self.logger.debug(f"JS username field search failed: {e}")
+            return None
+
+    async def _find_password_field_js(self) -> Optional[str]:
+        """Find password field using JavaScript."""
+        try:
+            selector = await self.browser.page.evaluate("""
+                () => {
+                    const field = document.querySelector('input[type="password"]');
+                    if (!field) return null;
+
+                    // Try to create most specific selector
+                    if (field.name) return `input[name="${field.name}"]`;
+                    if (field.id) return `input[id="${field.id}"]`;
+                    return 'input[type="password"]';
+                }
+            """)
+            return selector
+        except Exception as e:
+            self.logger.debug(f"JS password field search failed: {e}")
+            return None
+
+    async def _find_field_by_placeholder_or_label(self, field_type: str) -> Optional[str]:
+        """Find field by matching placeholder or associated label text."""
+        try:
+            if field_type == 'username':
+                keywords = ['username', 'user', 'email', 'login']
+            else:
+                keywords = ['password', 'pass']
+
+            elements = await self.browser.get_visible_elements()
+
+            for el in elements:
+                if el.get('tag') != 'input':
+                    continue
+
+                # Check placeholder, id, name
+                text = el.get('text', '').lower()
+                el_id = el.get('id', '').lower()
+
+                for keyword in keywords:
+                    if keyword in text or keyword in el_id:
+                        if field_type == 'password' and el.get('type') == 'password':
+                            return el['selector']
+                        elif field_type == 'username' and el.get('type') in ['text', 'email', '']:
+                            return el['selector']
+
+            return None
+        except Exception as e:
+            self.logger.debug(f"Placeholder/label search failed: {e}")
+            return None
+
+    async def _find_first_input_by_type(self, input_type: str) -> Optional[str]:
+        """Find first input of specified type (fallback strategy)."""
+        try:
+            if input_type == 'text':
+                selector = await self.browser.page.evaluate("""
+                    () => {
+                        const field = document.querySelector('input[type="text"], input[type="email"], input:not([type="password"]):not([type="hidden"])');
+                        if (!field) return null;
+                        if (field.name) return `input[name="${field.name}"]`;
+                        if (field.id) return `input[id="${field.id}"]`;
+                        return 'input[type="text"]';
+                    }
+                """)
+            else:  # password
+                selector = 'input[type="password"]'
+
+            return selector
+        except Exception as e:
+            self.logger.debug(f"Input type search failed: {e}")
+            return None
+
+    async def _clear_and_fill_field(self, selector: str, value: str):
+        """Clear field and fill with value using multiple methods for reliability."""
+        try:
+            # Wait for field to be visible
+            await self.browser.page.wait_for_selector(selector, state='visible', timeout=5000)
+
+            # Click to focus
+            await self.browser.page.click(selector)
+            await self.browser.page.wait_for_timeout(300)
+
+            # Clear existing content (multiple methods for reliability)
+            await self.browser.page.fill(selector, '')
+            await self.browser.page.evaluate(f'document.querySelector("{selector}").value = ""')
+
+            # Type the value
+            await self.browser.page.type(selector, value, delay=50)
+            await self.browser.page.wait_for_timeout(300)
+
+            # Verify the value was entered
+            entered_value = await self.browser.page.evaluate(f'document.querySelector("{selector}").value')
+            if entered_value != value:
+                self.logger.warning(f"Field value mismatch - retrying. Expected: {value}, Got: {entered_value}")
+                await self.browser.page.fill(selector, value)
+
+        except Exception as e:
+            self.logger.error(f"Failed to fill field {selector}: {e}")
+            raise
+
+    async def _find_and_click_submit_button(self, attempt: int) -> bool:
+        """Find and click login submit button using multiple strategies."""
+        try:
+            # Strategy 1: JavaScript-based button detection
+            if attempt == 1:
+                button_selector = await self.browser.page.evaluate("""
+                    () => {
+                        const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"]'));
+                        for (let btn of buttons) {
+                            const text = (btn.textContent || btn.value || '').toLowerCase();
+                            if (text.includes('login') || text.includes('sign in') || text.includes('submit')) {
+                                if (btn.id) return `#${btn.id}`;
+                                if (btn.name) return `[name="${btn.name}"]`;
+                                return `button:has-text("${btn.textContent}")`;
+                            }
+                        }
+                        return null;
+                    }
+                """)
+
+                if button_selector:
+                    await self.browser.page.click(button_selector)
+                    self.logger.info(f"✓ Clicked submit button: {button_selector}")
+                    return True
+
+            # Strategy 2: Using visible elements
+            elements = await self.browser.get_visible_elements()
+            for el in elements:
+                text_lower = el.get('text', '').lower()
+                tag = el.get('tag', '').lower()
+                el_type = el.get('type', '').lower()
+
+                if (tag == 'button' or el_type == 'submit') and \
+                   any(kw in text_lower for kw in ['login', 'sign in', 'submit', 'log in']):
+                    await self.browser.click_element(el['selector'])
+                    self.logger.info(f"✓ Clicked submit button: {el['text']}")
+                    return True
+
+            return False
+
+        except Exception as e:
+            self.logger.debug(f"Submit button click failed: {e}")
             return False
 
     def get_summary(self) -> Dict[str, Any]:

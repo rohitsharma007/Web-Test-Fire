@@ -311,7 +311,7 @@ class ReportAgent:
         pdf.section_title('Coverage Summary')
         pdf.body_text(
             f"Explored {len(state_tracker.visited_urls)} unique pages "
-            f"through {state_tracker.total_steps} interactions."
+            f"through {state_tracker.current_step} interactions."
         )
 
         pdf.ln(5)
