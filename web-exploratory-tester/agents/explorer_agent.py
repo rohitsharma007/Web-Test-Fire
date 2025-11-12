@@ -527,7 +527,10 @@ class ExplorerAgent:
         """
         try:
             # Wait for page to be ready
-            await self.browser.page.wait_for_timeout(1500)
+            await self.browser.page.wait_for_timeout(2000)  # Increased to 2s
+
+            # DIAGNOSTIC: Log all input fields on the page for debugging
+            await self._log_all_input_fields()
 
             # Strategy 1: Direct JavaScript selector approach (most reliable)
             if attempt == 1:
@@ -547,15 +550,17 @@ class ExplorerAgent:
 
             if not username_selector:
                 self.logger.error(f"Username field not found (Strategy {attempt})")
+                self.logger.error("All input detection strategies failed. Check diagnostic logs above.")
                 return False
 
             if not password_selector:
                 self.logger.error(f"Password field not found (Strategy {attempt})")
+                self.logger.error("All password detection strategies failed. Check diagnostic logs above.")
                 return False
 
             self.logger.info(f"Found login fields with Strategy {attempt} - filling credentials...")
-            self.logger.debug(f"Username selector: {username_selector}")
-            self.logger.debug(f"Password selector: {password_selector}")
+            self.logger.info(f"Username selector: {username_selector}")
+            self.logger.info(f"Password selector: {password_selector}")
 
             # Clear fields first
             await self._clear_and_fill_field(username_selector, self.username)
@@ -611,7 +616,59 @@ class ExplorerAgent:
 
         except Exception as e:
             self.logger.error(f"Login strategy {attempt} failed: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             return False
+
+    async def _log_all_input_fields(self):
+        """Diagnostic method to log all input fields found on the page."""
+        try:
+            self.logger.info("=" * 60)
+            self.logger.info("DIAGNOSTIC: Analyzing all input fields on the page")
+            self.logger.info("=" * 60)
+
+            fields_info = await self.browser.page.evaluate("""
+                () => {
+                    const inputs = Array.from(document.querySelectorAll('input'));
+                    return inputs.map((input, index) => {
+                        return {
+                            index: index,
+                            type: input.type || 'text',
+                            name: input.name || '',
+                            id: input.id || '',
+                            placeholder: input.placeholder || '',
+                            autocomplete: input.autocomplete || '',
+                            className: input.className || '',
+                            visible: input.offsetParent !== null,
+                            value: input.value || ''
+                        };
+                    });
+                }
+            """)
+
+            self.logger.info(f"Found {len(fields_info)} input fields total:")
+            for field in fields_info:
+                visibility = "VISIBLE" if field['visible'] else "HIDDEN"
+                self.logger.info(
+                    f"  [{field['index']}] {visibility} - Type: {field['type']}, "
+                    f"Name: '{field['name']}', ID: '{field['id']}', "
+                    f"Placeholder: '{field['placeholder']}', "
+                    f"Autocomplete: '{field['autocomplete']}'"
+                )
+
+            # Log visible inputs separately
+            visible_inputs = [f for f in fields_info if f['visible']]
+            self.logger.info(f"\nVisible inputs only: {len(visible_inputs)}")
+            for field in visible_inputs:
+                self.logger.info(
+                    f"  Type: {field['type']}, Name: '{field['name']}', "
+                    f"ID: '{field['id']}', Placeholder: '{field['placeholder']}'"
+                )
+
+            self.logger.info("=" * 60)
+
+        except Exception as e:
+            self.logger.warning(f"Could not log diagnostic info: {e}")
 
     async def _find_username_field_js(self) -> Optional[str]:
         """Find username field using JavaScript with multiple selectors."""
