@@ -55,12 +55,18 @@ class BrowserManager:
                 '--disable-gpu',  # Disable GPU hardware acceleration
                 '--no-first-run',
                 '--no-default-browser-check',
+                '--disable-setuid-sandbox',  # Disable sandbox for stability
+                '--no-sandbox',  # Disable sandboxing (required in some environments)
+                '--disable-accelerated-2d-canvas',
+                '--disable-software-rasterizer',
+                '--single-process',  # Run in single process to prevent crashes
             ]
 
             self.browser = await self.playwright.chromium.launch(
                 headless=self.headless,
                 args=launch_args,
-                timeout=60000  # Increase launch timeout
+                timeout=60000,  # Increase launch timeout
+                chromium_sandbox=False  # Disable Chromium sandbox
             )
 
             # Verify browser is connected
