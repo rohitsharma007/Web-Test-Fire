@@ -40,7 +40,9 @@ class WebExploratoryTester:
         max_steps: int = 50,
         depth: int = 3,
         headless: bool = True,
-        output_base: str = "outputs"
+        output_base: str = "outputs",
+        username: str = None,
+        password: str = None
     ):
         """
         Initialize the tester.
@@ -51,11 +53,15 @@ class WebExploratoryTester:
             depth: Maximum depth of navigation from base URL
             headless: Run browser in headless mode
             output_base: Base directory for outputs
+            username: Username for login (if login is required)
+            password: Password for login (if login is required)
         """
         self.url = url
         self.max_steps = max_steps
         self.depth = depth
         self.headless = headless
+        self.username = username
+        self.password = password
 
         # Set up directories
         self.output_base = ensure_directory(output_base)
@@ -66,6 +72,10 @@ class WebExploratoryTester:
         # Set up logging
         log_file = os.path.join(self.log_dir, "exploration.log")
         self.logger = setup_logger("WebExploratoryTester", log_file)
+
+        # Log credential status
+        if self.username and self.password:
+            self.logger.info("Credentials provided - will attempt automatic login")
 
         # Components
         self.browser = None
@@ -181,7 +191,9 @@ class WebExploratoryTester:
             state_tracker=self.state_tracker,
             screenshot_agent=self.screenshot_agent,
             max_steps=self.max_steps,
-            logger=self.logger
+            logger=self.logger,
+            username=self.username,
+            password=self.password
         )
 
         # Report agent
@@ -204,8 +216,16 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic exploration
   python main.py --url https://example.com
+
+  # With custom steps and depth
   python main.py --url https://example.com --max-steps 100 --depth 5
+
+  # With automatic login (credentials provided)
+  python main.py --url https://opensource-demo.orangehrmlive.com --username Admin --password admin123
+
+  # Non-headless mode
   python main.py --url https://example.com --headless False
 
 For more information, see README.md
@@ -247,6 +267,20 @@ For more information, see README.md
         help='Base directory for outputs (default: outputs)'
     )
 
+    parser.add_argument(
+        '--username',
+        type=str,
+        default=None,
+        help='Username for login (if authentication is required)'
+    )
+
+    parser.add_argument(
+        '--password',
+        type=str,
+        default=None,
+        help='Password for login (if authentication is required)'
+    )
+
     return parser.parse_args()
 
 
@@ -266,7 +300,9 @@ async def main():
         max_steps=args.max_steps,
         depth=args.depth,
         headless=args.headless,
-        output_base=args.output
+        output_base=args.output,
+        username=args.username,
+        password=args.password
     )
 
     # Run exploration
