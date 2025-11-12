@@ -14,6 +14,7 @@ This framework uses a multi-agent architecture to:
 ### Key Features
 
 - **Intelligent Navigation**: AI reasoning to select and interact with elements
+- **Automatic Login**: Detects and handles login forms with provided credentials
 - **Safe Exploration**: Avoids destructive actions (delete, logout, purchase)
 - **Automatic Popup Handling**: Manages cookie banners, dialogs, and modals
 - **Screenshot Documentation**: Visual evidence for every action
@@ -105,12 +106,27 @@ python main.py --url https://example.com \
 | `--depth` | Maximum navigation depth | 3 |
 | `--headless` | Run browser in headless mode | True |
 | `--output` | Base directory for outputs | outputs |
+| `--username` | Username for automatic login (optional) | - |
+| `--password` | Password for automatic login (optional) | - |
 
 ### Examples
 
-**Basic exploration:**
+**Scenario 1: Testing with Automatic Login (OrangeHRM Demo)**
 ```bash
-python main.py --url https://demo.testfire.net
+python3 main.py --url https://opensource-demo.orangehrmlive.com \
+  --username Admin --password admin123 --max-steps 25
+```
+
+**Scenario 2: Your Custom Application with Authentication**
+```bash
+python3 main.py --url https://your-app.com/login \
+  --username testuser --password testpass123
+```
+
+**Scenario 3: Public Site (No Login Required)**
+```bash
+python3 main.py --url https://example.com --max-steps 50
+# Works normally, no login attempt
 ```
 
 **Extended exploration with visible browser:**
@@ -148,6 +164,50 @@ After exploration, the framework generates:
 ### 4. Execution Logs
 - Location: `logs/exploration.log`
 - Detailed execution log with timestamps
+
+## Intelligent Automatic Login
+
+The framework now includes **AI-driven automatic login detection and execution**. When you provide credentials, the system intelligently:
+
+### How It Works
+
+1. **Detects Login Pages** - Analyzes URL, page title, and form elements to identify login pages
+2. **Finds Form Fields** - Intelligently locates username/email and password input fields
+3. **Fills Credentials** - Automatically enters the provided username and password
+4. **Submits Form** - Finds and clicks the login button (or presses Enter)
+5. **Verifies Success** - Checks if login was successful before continuing exploration
+6. **Continues Testing** - Explores authenticated areas of the application
+
+### When to Use
+
+Provide `--username` and `--password` when:
+- Testing applications that require authentication
+- Exploring features behind login walls
+- Testing user-specific workflows
+- Validating authenticated user experiences
+
+### What It Detects
+
+The system recognizes login pages by looking for:
+- Password input fields (`input[type="password"]`)
+- Username/email fields with common labels
+- URLs containing: `login`, `signin`, `auth`
+- Page titles mentioning login or sign in
+- Submit buttons with login-related text
+
+### Example Output
+
+```
+[INFO] Credentials provided - will attempt automatic login
+[INFO] Login page detected - attempting automatic login
+[INFO] Attempting login with username: Admin
+[INFO] Found login form fields - filling credentials...
+[INFO] Username entered successfully
+[INFO] Password entered successfully
+[INFO] Clicking submit button: Login
+[INFO] Login successful! Now at: https://app.com/dashboard
+[INFO] Login successful! Continuing exploration...
+```
 
 ## How It Works
 
@@ -397,7 +457,7 @@ This tool is for **authorized testing only**. Always obtain proper permission be
 ## Limitations
 
 - **JavaScript-heavy sites**: May have timing issues with dynamic content
-- **Authentication**: Does not handle complex login flows automatically
+- **Complex authentication**: Handles standard login forms; may not work with OAuth, SSO, or multi-factor authentication
 - **CAPTCHAs**: Cannot bypass CAPTCHA challenges
 - **Rate limiting**: May trigger rate limits on some sites
 - **Same-domain only**: Exploration limited to starting domain
@@ -411,7 +471,7 @@ Potential improvements:
 - [ ] HTML diff comparison for before/after states
 - [ ] Interactive replay dashboard
 - [ ] Custom plugin system
-- [ ] Authentication flow handling
+- [ ] Advanced authentication (OAuth, SSO, MFA)
 - [ ] Performance metrics collection
 
 ## Contributing
