@@ -390,7 +390,7 @@ class ExplorerAgent:
 
     async def _is_login_page(self) -> bool:
         """
-        Detect if the current page is a login page.
+        Detect if the current page is a login page with multi-language support.
 
         Returns:
             True if login page detected, False otherwise
@@ -399,10 +399,23 @@ class ExplorerAgent:
             # Get all visible elements
             elements = await self.browser.get_visible_elements()
 
-            # Look for login indicators
+            # Multi-language login indicators
             login_indicators = [
+                # English
                 'username', 'user name', 'email', 'login', 'sign in',
-                'password', 'passwd', 'pwd'
+                'password', 'passwd', 'pwd',
+                # French
+                'nom d\'utilisateur', 'utilisateur', 'connexion', 'mot de passe',
+                # Spanish
+                'usuario', 'correo', 'contraseña', 'iniciar sesión',
+                # German
+                'benutzername', 'benutzer', 'kennwort', 'passwort', 'anmelden',
+                # Portuguese
+                'usuário', 'senha', 'entrar',
+                # Italian
+                'utente', 'password', 'accedi',
+                # Dutch
+                'gebruikersnaam', 'wachtwoord', 'inloggen'
             ]
 
             # Check page title and URL
@@ -412,25 +425,46 @@ class ExplorerAgent:
             title_lower = page_title.lower()
             url_lower = current_url.lower()
 
+            # Multi-language URL/title keywords
+            url_keywords = [
+                'login', 'signin', 'auth', 'connexion', 'anmelden',
+                'entrar', 'accedi', 'inloggen', 'iniciar'
+            ]
+
             # Check if URL or title contains login indicators
             if any(indicator in url_lower or indicator in title_lower
-                   for indicator in ['login', 'signin', 'auth']):
-                self.logger.debug("Login page detected from URL/title")
+                   for indicator in url_keywords):
+                self.logger.debug(f"Login page detected from URL/title: {current_url}")
                 return True
 
-            # Check for password input fields
+            # Check for password input fields (universal across languages)
             password_fields = [el for el in elements
-                             if el.get('type') == 'password' or
-                             'password' in el.get('text', '').lower()]
+                             if el.get('type') == 'password']
 
-            # Check for username/email input fields
+            if not password_fields:
+                return False
+
+            # Check for username/email input fields with multi-language support
             username_fields = [el for el in elements
-                             if any(indicator in el.get('text', '').lower()
-                                  for indicator in login_indicators)]
+                             if el.get('tag') == 'input' and
+                             el.get('type') in ['text', 'email', ''] and
+                             any(indicator in el.get('text', '').lower() or
+                                 indicator in el.get('id', '').lower() or
+                                 indicator in str(el.get('selector', '')).lower()
+                                 for indicator in login_indicators)]
 
             # If we have both password and username fields, it's likely a login page
             if password_fields and username_fields:
                 self.logger.debug(f"Login page detected: found {len(password_fields)} password field(s) and {len(username_fields)} username field(s)")
+                return True
+
+            # If we have a password field and at least one text input, it's likely a login page
+            text_inputs = [el for el in elements
+                          if el.get('tag') == 'input' and
+                          el.get('type') in ['text', 'email', '']]
+
+            if password_fields and text_inputs:
+                self.logger.debug(f"Login page detected: found password field and {len(text_inputs)} text input(s)")
                 return True
 
             return False
@@ -732,47 +766,118 @@ class ExplorerAgent:
             raise
 
     async def _find_and_click_submit_button(self, attempt: int) -> bool:
-        """Find and click login submit button using multiple strategies."""
+        """Find and click login submit button using multiple strategies with multi-language support."""
         try:
-            # Strategy 1: JavaScript-based button detection
+            # Multi-language keywords for login buttons
+            login_keywords = [
+                # English
+                'login', 'sign in', 'submit', 'log in', 'signin',
+                # French
+                'connexion', 'se connecter', 'soumettre',
+                # Spanish
+                'iniciar sesión', 'entrar', 'ingresar',
+                # German
+                'anmelden', 'einloggen',
+                # Portuguese
+                'entrar', 'conectar',
+                # Italian
+                'accedi', 'entra',
+                # Dutch
+                'inloggen',
+                # Japanese
+                'ログイン',
+                # Chinese
+                '登录', '登入',
+                # Common variations
+                'go', 'enter', 'access'
+            ]
+
+            # Strategy 1: JavaScript-based button detection with multi-language support
             if attempt == 1:
-                button_selector = await self.browser.page.evaluate("""
-                    () => {
-                        const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"]'));
-                        for (let btn of buttons) {
-                            const text = (btn.textContent || btn.value || '').toLowerCase();
-                            if (text.includes('login') || text.includes('sign in') || text.includes('submit')) {
-                                if (btn.id) return `#${btn.id}`;
-                                if (btn.name) return `[name="${btn.name}"]`;
-                                return `button:has-text("${btn.textContent}")`;
-                            }
-                        }
+                keywords_js = str(login_keywords).replace("'", '"')
+                button_selector = await self.browser.page.evaluate(f"""
+                    () => {{
+                        const keywords = {keywords_js};
+                        const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], a[role="button"], [role="button"]'));
+
+                        for (let btn of buttons) {{
+                            const text = (btn.textContent || btn.value || '').toLowerCase().trim();
+                            const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+                            const title = (btn.getAttribute('title') || '').toLowerCase();
+
+                            // Check if button text/attributes match any keyword
+                            for (let keyword of keywords) {{
+                                if (text.includes(keyword.toLowerCase()) ||
+                                    ariaLabel.includes(keyword.toLowerCase()) ||
+                                    title.includes(keyword.toLowerCase())) {{
+
+                                    // Try to create specific selector
+                                    if (btn.id) return `#${{btn.id}}`;
+                                    if (btn.name) return `[name="${{btn.name}}"]`;
+                                    if (btn.type === 'submit') return 'input[type="submit"]';
+
+                                    // Use text-based selector as fallback
+                                    const btnText = (btn.textContent || btn.value || '').trim();
+                                    if (btnText) return `button:has-text("${{btnText}}")`;
+                                }}
+                            }}
+                        }}
+
+                        // Last resort: find submit button by type
+                        const submitBtn = document.querySelector('button[type="submit"], input[type="submit"]');
+                        if (submitBtn) {{
+                            if (submitBtn.id) return `#${{submitBtn.id}}`;
+                            if (submitBtn.name) return `[name="${{submitBtn.name}}"]`;
+                            return 'button[type="submit"], input[type="submit"]';
+                        }}
+
                         return null;
-                    }
+                    }}
                 """)
 
                 if button_selector:
-                    await self.browser.page.click(button_selector)
+                    self.logger.info(f"Found submit button with selector: {button_selector}")
+                    await self.browser.page.click(button_selector, timeout=5000)
                     self.logger.info(f"✓ Clicked submit button: {button_selector}")
                     return True
 
-            # Strategy 2: Using visible elements
+            # Strategy 2: Using visible elements with multi-language support
             elements = await self.browser.get_visible_elements()
             for el in elements:
-                text_lower = el.get('text', '').lower()
+                text_lower = el.get('text', '').lower().strip()
                 tag = el.get('tag', '').lower()
                 el_type = el.get('type', '').lower()
 
-                if (tag == 'button' or el_type == 'submit') and \
-                   any(kw in text_lower for kw in ['login', 'sign in', 'submit', 'log in']):
-                    await self.browser.click_element(el['selector'])
-                    self.logger.info(f"✓ Clicked submit button: {el['text']}")
+                # Check if it's a button-like element
+                if tag == 'button' or el_type == 'submit' or el.get('role') == 'button':
+                    # Check against all language keywords
+                    for keyword in login_keywords:
+                        if keyword.lower() in text_lower:
+                            self.logger.info(f"Found login button with text: {el['text']}")
+                            await self.browser.click_element(el['selector'])
+                            self.logger.info(f"✓ Clicked submit button: {el['text']}")
+                            return True
+
+            # Strategy 3: Try any submit button type as last resort
+            try:
+                submit_exists = await self.browser.page.evaluate("""
+                    () => {
+                        return !!document.querySelector('button[type="submit"], input[type="submit"]');
+                    }
+                """)
+
+                if submit_exists:
+                    self.logger.info("Using type='submit' button as fallback")
+                    await self.browser.page.click('button[type="submit"], input[type="submit"]', timeout=3000)
+                    self.logger.info("✓ Clicked submit button (by type)")
                     return True
+            except:
+                pass
 
             return False
 
         except Exception as e:
-            self.logger.debug(f"Submit button click failed: {e}")
+            self.logger.error(f"Submit button click failed: {e}")
             return False
 
     def get_summary(self) -> Dict[str, Any]:
